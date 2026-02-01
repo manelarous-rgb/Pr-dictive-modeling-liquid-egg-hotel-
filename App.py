@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-
+import pickle
+import os
 from io import BytesIO
 
 # --- 1. CONFIGURATION DE LA PAGE ---
@@ -520,7 +521,7 @@ st.markdown(
         font-weight: 900 !important;
         color: #a3ff12 !important; 
         text-transform: uppercase;
-        text-shadow: 0 0 10px #a3ff12, 0 0 20px #a3ff12 !important;
+        text-shadow: 0 0 5px #a3ff12, 0 0 20px #a3ff12 !important;
         letter-spacing: 1px;
     }
 
@@ -649,17 +650,21 @@ with st.sidebar:
                 col_date = next((c for c in df.columns if 'date' in c.lower()), None)
     
                 # -- ------------------ Vérification finale avant création de la série graphique --------
+                # --- VÉRIFICATION ET CRÉATION DE LA SÉRIE ---
+                hôtels_disponibles = df['Nom de l’hôtel'].unique() # Adaptez le nom de la colonne
+                hotel_choisi = st.sidebar.selectbox("Sélectionnez un établissement", hôtels_disponibles)
                 if not df_filtered.empty and col_date:
                     df_filtered = df_filtered.sort_values(col_date)
-                    # On cherche la colonne de consommation
-                    col_conso = next((c for c in df_filtered.columns if 'consommation' in c.lower()), df_filtered.columns[0])
-                    # Création de la série pour le graphique
-                    conso_series = df_filtered.set_index(col_date)[col_conso]
-                    st.success(f"✅ {hotel} ({region_choisie})")
+                    if col_conso in df_filtered.columns:
+                        conso_series = df_filtered.set_index(col_date)[col_conso]
+                        st.success(f"✅ {hotel_choisi}")
+                    else:
+                        st.error(f"La colonne '{col_conso}' est absente des données.")
+                        conso_series = pd.Series()
                 else:
-                    conso_series = pd.Series(dtype=float)
-                    if not col_date:
-                        st.error("❌ Colonne 'Date' introuvable dans le fichier.")
+                    # Crucial : On crée une série vide pour que la ligne 690 ne crash pas
+                    st.warning("⚠️ Aucune donnée trouvée pour cette sélection.")
+                    conso_series = pd.Series() # On crée une série vide pour ne pas faire planter la suite
 
 
 
@@ -687,10 +692,54 @@ if not df_filtered.empty:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # --- 4. PRÉPARATION DES DONNÉES ET DU GRAPHIQUE (DÉPLACÉ ICI) ---
-y_2025 = conso_series.values
-x_2025 = df_filtered['Date']
-x_2026 = x_2025 + pd.DateOffset(years=1)
-y_2026 = y_2025 * 1.05 
+if not conso_series.empty:
+    y_2025 = conso_series.values
+    x_2025 = df_filtered['Date']
+    x_2026 = x_2025 + pd.DateOffset(years=1)
+else:
+    y_2025 = []
+    x_2025 = []
+    x_2026 = []
+0
+# --- Chargement du modèle ---
+model = None
+model_path = "model.pkl"
+
+if os.path.exists(model_path):
+    with open(model_path, 'rb') as f:
+        model = pickle.load(f)
+else:
+    st.error("⚠️ Le fichier model.pkl est introuvable sur GitHub.")
+
+
+    
+    # --- 5. PRÉPARATION ET PRÉDICTION XGBOOST ---
+if model is not None and not df_filtered.empty:
+    # 1. On prépare les données futures (X_test_2026)
+    # Assurez-vous que X_test_2026 est défini ici selon votre logique de dates
+    
+    # 2. Nettoyage strict des colonnes pour correspondre à l'entraînement
+    cols_a_retirer = ['Unnamed: 8', 'Unnamed: 11', 'Consommation Œuf']
+    X_test_2026 = X_test_2026.drop(columns=[c for c in cols_a_retirer if c in X_test_2026.columns], errors='ignore')
+
+    # 3. Suppression des valeurs nulles (Indispensable pour XGBoost)
+    X_test_2026 = X_test_2026.fillna(0)
+
+    try:
+        # 4. Tentative de prédiction réelle
+        y_2026 = model.predict(X_test_2026)
+    except Exception as e:
+        # 5. Sécurité : Si le modèle échoue, on évite l'écran rouge
+        st.warning(f"⚠️ Mode secours activé (Erreur: {e})")
+        y_2026 = y_2025 * 1.0  
+else:
+    # Si pas de modèle ou pas de données, on maintient une ligne stable
+    y_2026 = y_2025 * 1.0 if len(y_2025) > 0 else []
+
+
+
+
+
 
 fig = go.Figure()
 # Traces Pcs
@@ -728,6 +777,7 @@ col_left, col_right = st.columns([2.2, 1])
 # --- --------------------------------------------------------------------------------     Left : GRAPHIQUE PRINCIPAL      ---------------------------------------------------------------------------------------------------------------- 
 with col_left:
     # BANDEAU HEADER (Style exact image_51e6fb.png)
+    nom_pour_affichage = hotel_choisi.upper() if (hotel_choisi and hotel_choisi is not None) else "SÉLECTION"
     st.markdown(f"""
         <div style="
             background-color: #161b22;
@@ -743,7 +793,7 @@ with col_left:
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span style="font-size: 1.1rem;">📈</span>
                 <span style="color: white; font-weight: 700; font-size: 0.9rem;">
-                    TRAJECTOIRE DE CONSOMMATION : <span style="color: #a3ff12;">{hotel.upper()}</span>
+                    TRAJECTOIRE DE CONSOMMATION : <span style="color: #a3ff12;">{nom_affichage}</span>
                 </span>
             </div>
             <div style="display: flex; align-items: center; background: rgba(35, 134, 54, 0.1); border: 1px solid #238636; border-radius: 20px; padding: 2px 2px 2px 12px; gap: 8px;">
@@ -756,7 +806,6 @@ with col_left:
     # LE GRAPHIQUE (L'UNIQUE APPEL)
     # J'ajoute une 'key' unique pour forcer Streamlit à oublier les anciens IDs
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="unique_chart_demand")
-
 
 
 # --- -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -782,27 +831,31 @@ analyses_predictives = {
 }
 # --- 2. BARRE LATÉRALE (Source unique de vérité) ------------------------------------------------------
 with st.sidebar:
+    st.title("Settings")
     
+    # La sélection de l'hôtel
     hotel_choisi = st.selectbox(
         "Sélectionnez un établissement", 
         options=sorted(df[col_nom].unique()),
         key="main_selector"
     )
+
+# --- 3. FILTRAGE ET ANALYSE (En dehors du bloc 'with') ---
+# Maintenant on utilise la sélection pour filtrer
+hotel = hotel_choisi 
+df_filtered = df_temp[df_temp[col_hotel] == hotel].copy()
+
+# Ton dictionnaire reste accessible pour tout le script
 analyses_ia = {
     "Hasdrubal Prestige Thalassa & Spa": {
-        "description": "L'analyse 2025 vs 2026 montre une consolidation des volumes durant la haute saison. Septembre marque le retour des 'Seniors de Prestige'. L'événement clé du Mouled (début septembre) génère un pic de demande spécifique pour l'Assida Zgougou, nécessitant une hausse de la crème pâtissière fine par rapport à la basse saison hivernale.",
+        "description": "L'analyse 2025 vs 2026 montre une consolidation des volumes...",
         "tendance": "Hausse structurelle liée aux événements culturels.",
         "logique": "(198 Suites × Taux Occ) × Ratio Tradition"
     },
     "Amir Palace": {
-        "description": "Le comparatif 2025 vs 2026 indique une stabilité des flux. La haute saison estivale s'étend jusqu'à fin septembre avec une consommation soutenue pour les buffets 'Tout Compris'. La transition vers la basse saison en octobre prévoit une réduction de 20% des volumes hebdomadaires.",
-        "tendance": "Saisonnalité marquée avec maintien des volumes en haute saison.",
+        "description": "Le comparatif 2025 vs 2026 indique une stabilité des flux...",
+        "tendance": "Saisonnalité marquée.",
         "logique": "Modèle statistique basé sur l'historique d'occupation"
-    },
-    "Concorde Marco Polo": {
-        "description": "Progression modérée des prévisions 2026 par rapport à 2025. La haute saison bénéficie d'un taux d'occupation record, tandis que l'analyse IA identifie une opportunité d'optimisation des stocks lors du passage en basse saison pour réduire le gaspillage.",
-        "tendance": "Optimisation des flux en période de transition.",
-        "logique": "Modèle saisonnier linéaire ajusté"
     }
 }
     # Ajoutez les autres hôtels ici sur le même modèle

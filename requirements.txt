@@ -6,3 +6,6 @@ requests
 joblib
 matplotlib
 scikit-learn
+XGBoost
+tensorflow
+openpyxl
