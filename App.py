@@ -1094,12 +1094,11 @@ import os
 @st.cache_data
 def load_data():
     file_name = 'Donnees_Calculées.xlsx' #
-    alt_path = r"C:\Users\basma\OneDrive\Bureau\Streamlit1\Donnees_Calculees.xlsx" #
     
     if os.path.exists(file_name):
         return pd.read_excel(file_name)
-    elif os.path.exists(alt_path):
-        return pd.read_excel(alt_path)
+    elif 
+        st.error(f"Le fichier '{file_name}' est introuvable. Veuillez vérifier le chemin et le nom du fichier.")    
     return None
 
 df_global = load_data()
