@@ -1097,9 +1097,10 @@ def load_data():
     
     if os.path.exists(file_name):
         return pd.read_excel(file_name)
-    elif 
-        st.error(f"Le fichier '{file_name}' est introuvable. Veuillez vérifier le chemin et le nom du fichier.")    
-    return None
+    else:
+        # Affiche une erreur explicite si le fichier n'est pas trouvé
+        st.error(f"Erreur : Le fichier '{file_name}' est introuvable sur le serveur.")
+        return None
 
 df_global = load_data()
 
