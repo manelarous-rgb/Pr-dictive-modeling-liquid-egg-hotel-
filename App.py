@@ -669,10 +669,11 @@ if not df_filtered.empty:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 4. PRÉPARATION DES DONNÉES ET DU GRAPHIQUE (DÉPLACÉ ICI) ---
+# --- 4. PRÉPARATION DES DONNÉES ET DU GRAPHIQUE (DÉPLACÉ ICI) -----------------------------------------------
 y_2025 = conso_series.values
 x_2025 = df_filtered['Date'] if not df_filtered.empty else []
 x_2026 = x_2025 + pd.DateOffset(years=1) if not df_filtered.empty else []
+
 # 1. DÉFINIR le chemin d'abord
 model = None  # <--- CRUCIAL : initialise la variable ici
 model_path = "model.pkl"
