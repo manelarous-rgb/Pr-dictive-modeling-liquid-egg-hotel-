@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import pickle
 import os
 from io import BytesIO
+st.title("TEST : LE CODE EST BIEN MIS À JOUR")
 
 # --- 1. CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="Predictive Modeling", layout="wide")
@@ -651,9 +652,8 @@ with st.sidebar:
 conso_series = pd.Series([0])
 if not df_filtered.empty:
     # Récupération des données
-    conso_col = next((c for c in df.columns if 'consommation' in c.lower()), df.columns[0])
+    conso_col = next((c for c in df_filtered.columns if 'consommation' in c.lower()), df_filtered.columns[0])
     conso_series = pd.to_numeric(df_filtered[conso_col], errors='coerce').fillna(0)
-    
     # Création des 3 colonnes
     cols_kpi = st.columns(3)
     
