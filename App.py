@@ -1093,13 +1093,12 @@ import os
 # --- CHARGEMENT SÉCURISÉ ---
 @st.cache_data
 def load_data():
-    file_name = 'Donnees_Calculées.xlsx' #
+    file_name = 'Donnees_Calculees.xlsx' #
     
-    if os.path.exists(file_name):
+    try:
         return pd.read_excel(file_name)
-    else:
-        # Affiche une erreur explicite si le fichier n'est pas trouvé
-        st.error(f"Erreur : Le fichier '{file_name}' est introuvable sur le serveur.")
+    except Exception as e:
+        st.error(f"Erreur lors du chargement du fichier Excel : {e}")
         return None
 
 df_global = load_data()
