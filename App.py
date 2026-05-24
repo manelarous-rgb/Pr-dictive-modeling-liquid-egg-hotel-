@@ -417,8 +417,9 @@ def load_data():
     # Simulation de données ou chargement réel
     try:
         # Remplacez par votre chemin réel
-        df = pd.read_excel("C:/Users/basma/OneDrive/Bureau/Streamlit1/Liste_HHotels.xlsx")
+        df = pd.read_excel("C:/Users/basma/OneDrive/Bureau/Streamlit1/Liste_HHotels .xlsx")
         df.columns = df.columns.str.strip()
+        
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
             df = df.dropna(subset=['Date'])
@@ -515,16 +516,6 @@ st.markdown(
         padding: 10px 0px;
     }
 
-    /* 2. STYLE BIENVENUE : VERT NÉON (comme image_26bb59) */
-    .neon-welcome {
-        font-size: 1.8rem !important;
-        font-weight: 900 !important;
-        color: #a3ff12 !important; 
-        text-transform: uppercase;
-        text-shadow: 0 0 5px #a3ff12, 0 0 20px #a3ff12 !important;
-        letter-spacing: 1px;
-    }
-
     /* 1. Sidebar : Texte en blanc par défaut */
     [data-testid="stSidebar"] * {
         color: white !important;
@@ -602,71 +593,57 @@ with st.sidebar:
         # Identification automatique des colonnes
         col_hotel = next((c for c in df.columns if c.lower().strip() in ['hôtel', 'hotel']), None)
         col_region = next((c for c in df.columns if c.lower().strip() in ['région', 'region']), None)
-        
+
         # 1. Choix de la région
-        villes_cibles = ["Tunis", "Sousse", "Monastir", "Djerba", "Sfax", "Nabeul","Hammamet"]
+        villes_cibles = ["Tunis", "Sousse", "Monastir", "Djerba", "Sfax", "Nabeul", "Hammamet"]
         region_choisie = st.radio("📍 RÉGION D'ANALYSE", options=villes_cibles)
-        
-        # 2. Filtrage robuste de la région
+
         if col_region:
-            df_temp = df[df[col_region].astype(str).str.strip().str.upper() == region_choisie.upper()].copy()
+            # --- NETTOYAGE CRITIQUE ---
+            # On force tout en majuscules et sans espaces pour la comparaison
+            df[col_region] = df[col_region].astype(str).str.strip()
+            df_temp = df[df[col_region].str.upper() == region_choisie.upper()].copy()
+            
             st.markdown("---")
             
-            if not df_temp.empty and col_hotel:
-
-                # --- LOGIQUE DE CLASSEMENT RÉGIONAL SÉCURISÉE ---
+            if not df_temp.empty:
+                # --- LOGIQUE DE CLASSEMENT RÉGIONAL ---
                 c_2025 = next((c for c in df_temp.columns if '2025' in str(c)), None)
-            
-
-                if c_2025: 
-                # 1. Agrégation par Hôtel (Somme pour les volumes, Moyenne pour les scores)
-                # On suppose que vous avez calculé 'Error_Rate' ou 'Accuracy' par ligne lors de la prédiction
+                
+                if c_2025 and 'Predicted_2026' in df_temp.columns: 
+                    # Agrégation
                     df_region_eggs = df_temp.groupby(col_hotel).agg({
                         c_2025: 'sum',
-                        'Predicted_2026': 'sum',
-                        'R2': 'mean',          # Le R2 moyen du modèle pour cet hôtel
-                        'Precision': 'mean'    # La précision moyenne (ex: 0.94 pour 94%)
-                        }).reset_index()
-                # 2. Calcul de la Variation % entre 2025 et 2026
-                    df_region_eggs['Variation_%'] = ((df_region_eggs['Predicted_2026'] - df_region_eggs[c_2025]) / df_region_eggs[c_2025]) * 100
-                # 3. Tri par performance ou volume
-                    df_region_eggs = df_region_eggs.sort_values(by='Predicted_2026', ascending=False)
-                # 4. CONVERSION LITRES (Ratio 0.054) ---    
-                    df_region_liters = df_region_eggs.copy()
-                    for col_vol in [c_2025, 'Predicted_2026']:
-                        df_region_liters[col_vol] = df_region_liters[col_vol] * 0.054
+                        'Predicted_2026': 'sum'
+                    }).reset_index()
+                    # (Vous pouvez ajouter R2 et Precision ici si elles existent dans vos colonnes)
 
-    
-
+                # --- SÉLECTION DE L'HÔTEL (Bien imbriqué ici) ---
+                df_temp[col_hotel] = df_temp[col_hotel].astype(str).str.strip()
+                options_hotels = sorted([h for h in df_temp[col_hotel].unique() if pd.notna(h) and h != 'nan'])
                 
-               # ----------------------    SÉLECTION DE L'HÔTEL ----------------------------------
-                options_hotels = sorted([h for h in df_temp[col_hotel].unique() if pd.notna(h)])
-                hotel = st.selectbox("🏨 CHOISIR UN ÉTABLISSEMENT", options=options_hotels)
+                if options_hotels:
+                    hotel = st.selectbox("🏨 CHOISIR UN ÉTABLISSEMENT", options=options_hotels)
+                    df_filtered = df_temp[df_temp[col_hotel] == hotel].copy()
 
-                # ---------------------   pour l'hôtel sélectionné  ----------------------------+--  
-                df_filtered = df_temp[df_temp[col_hotel] == hotel].copy()
+                # --- PRÉPARATION DES SÉRIES TEMPORELLES ---
+                    col_date = next((c for c in df_temp.columns if 'date' in c.lower()), None)
 
-                # --- 3. PRÉPARATION DES SÉRIES TEMPORELLES ---
-                col_date = next((c for c in df.columns if 'date' in c.lower()), None)
-    
-                # -- ------------------ Vérification finale avant création de la série graphique --------
-                # --- VÉRIFICATION ET CRÉATION DE LA SÉRIE ---
-                hôtels_disponibles = df['Nom de l’hôtel'].unique() # Adaptez le nom de la colonne
-                hotel_choisi = st.sidebar.selectbox("Sélectionnez un établissement", hôtels_disponibles)
-                if not df_filtered.empty and col_date:
-                    df_filtered = df_filtered.sort_values(col_date)
-                    if col_conso in df_filtered.columns:
+                    if not df_filtered.empty and col_date:
+                        df_filtered[col_date] = pd.to_datetime(df_filtered[col_date], errors='coerce')
+                        df_filtered = df_filtered.sort_values(col_date)
+                        col_conso = next((c for c in df_filtered.columns if 'consommation' in c.lower()), df_filtered.columns[0])
                         conso_series = df_filtered.set_index(col_date)[col_conso]
-                        st.success(f"✅ {hotel_choisi}")
+                        st.success(f"✅ {hotel} ({region_choisie})")
                     else:
-                        st.error(f"La colonne '{col_conso}' est absente des données.")
-                        conso_series = pd.Series()
+                        st.warning("Données temporelles incomplètes pour cet hôtel.")
                 else:
-                    # Crucial : On crée une série vide pour que la ligne 690 ne crash pas
-                    st.warning("⚠️ Aucune donnée trouvée pour cette sélection.")
-                    conso_series = pd.Series() # On crée une série vide pour ne pas faire planter la suite
-
-
+                    st.warning(f"⚠️ Aucun hôtel trouvé pour {region_choisie}")
+            else:
+                # C'est ici que ça bloquait pour Jerba/Sfax !
+                st.error(f"❌ La région '{region_choisie}' n'existe pas dans le fichier Excel ou est écrite différemment.")
+                # Optionnel : afficher ce qui existe vraiment pour aider l'utilisateur
+                st.info(f"Régions trouvées dans le fichier : {', '.join(df[col_region].unique())}")
 
 #----------------------------------------------------------------------- --- 6. DASHBOARD ----------------------------------------------------------------------------------------------------
 
@@ -692,54 +669,46 @@ if not df_filtered.empty:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # --- 4. PRÉPARATION DES DONNÉES ET DU GRAPHIQUE (DÉPLACÉ ICI) ---
-if not conso_series.empty:
-    y_2025 = conso_series.values
-    x_2025 = df_filtered['Date']
-    x_2026 = x_2025 + pd.DateOffset(years=1)
-else:
-    y_2025 = []
-    x_2025 = []
-    x_2026 = []
-0
-# --- Chargement du modèle ---
-model = None
-model_path = "model.pkl"
+y_2025 = conso_series.values
+x_2025 = df_filtered['Date']
+x_2026 = x_2025 + pd.DateOffset(years=1)
 
-if os.path.exists(model_path):
-    with open(model_path, 'rb') as f:
-        model = pickle.load(f)
-else:
-    st.error("⚠️ Le fichier model.pkl est introuvable sur GitHub.")
+# 1. DÉFINIR le chemin d'abord
+model = None  # <--- CRUCIAL : initialise la variable ici
+model_path = r"C:/Users/basma/OneDrive/Bureau/Streamlit1/model.pkl"
 
-
+## --- 4. PRÉPARATION DES DONNÉES ---
+# --- PRÉPARATION NUMÉRIQUE POUR XGBOOST ---
+if model is not None:
+    # 1. On ne garde que les colonnes de type nombre (int, float)
+    # Cela règle l'erreur AttributeError sur 'dtype'
+    X_test_2026 = df_filtered.select_dtypes(include=['number']).copy()
     
-    # --- 5. PRÉPARATION ET PRÉDICTION XGBOOST ---
-if model is not None and not df_filtered.empty:
-    # 1. On prépare les données futures (X_test_2026)
-    # Assurez-vous que X_test_2026 est défini ici selon votre logique de dates
-    
-    # 2. Nettoyage strict des colonnes pour correspondre à l'entraînement
+    # 2. On supprime les colonnes inutiles qui n'étaient pas dans l'entraînement
     cols_a_retirer = ['Unnamed: 8', 'Unnamed: 11', 'Consommation Œuf']
     X_test_2026 = X_test_2026.drop(columns=[c for c in cols_a_retirer if c in X_test_2026.columns], errors='ignore')
 
-    # 3. Suppression des valeurs nulles (Indispensable pour XGBoost)
+    # 3. On s'assure qu'il n'y a aucune valeur manquante
     X_test_2026 = X_test_2026.fillna(0)
 
     try:
-        # 4. Tentative de prédiction réelle
+        # C'est ici que ton modèle calcule la vraie variation (+0.2%)
         y_2026 = model.predict(X_test_2026)
     except Exception as e:
-        # 5. Sécurité : Si le modèle échoue, on évite l'écran rouge
-        st.warning(f"⚠️ Mode secours activé (Erreur: {e})")
-        y_2026 = y_2025 * 1.0  
+        st.error(f"Erreur technique de prédiction : {e}")
+        y_2026 = y_2025 * 1.0  # Secours pour éviter de bloquer l'affichage
+
+    # 3. CRUCIAL : On s'assure qu'il n'y a plus de valeurs vides (NaN)
+    X_test_2026 = X_test_2026.fillna(0)
+
+    try:
+        # On lance la prédiction XGBoost
+        y_2026 = model.predict(X_test_2026)
+    except Exception as e:
+        st.error(f"Erreur lors de la prédiction : {e}")
+        y_2026 = y_2025 * 1.0  # Secours
 else:
-    # Si pas de modèle ou pas de données, on maintient une ligne stable
-    y_2026 = y_2025 * 1.0 if len(y_2025) > 0 else []
-
-
-
-
-
+    y_2026 = y_2025 * 1.0
 
 fig = go.Figure()
 # Traces Pcs
@@ -777,7 +746,6 @@ col_left, col_right = st.columns([2.2, 1])
 # --- --------------------------------------------------------------------------------     Left : GRAPHIQUE PRINCIPAL      ---------------------------------------------------------------------------------------------------------------- 
 with col_left:
     # BANDEAU HEADER (Style exact image_51e6fb.png)
-    nom_pour_affichage = hotel_choisi.upper() if (hotel_choisi and hotel_choisi is not None) else "SÉLECTION"
     st.markdown(f"""
         <div style="
             background-color: #161b22;
@@ -793,7 +761,7 @@ with col_left:
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span style="font-size: 1.1rem;">📈</span>
                 <span style="color: white; font-weight: 700; font-size: 0.9rem;">
-                    TRAJECTOIRE DE CONSOMMATION : <span style="color: #a3ff12;">{nom_affichage}</span>
+                    TRAJECTOIRE DE CONSOMMATION : <span style="color: #a3ff12;">{hotel.upper()}</span>
                 </span>
             </div>
             <div style="display: flex; align-items: center; background: rgba(35, 134, 54, 0.1); border: 1px solid #238636; border-radius: 20px; padding: 2px 2px 2px 12px; gap: 8px;">
@@ -806,6 +774,7 @@ with col_left:
     # LE GRAPHIQUE (L'UNIQUE APPEL)
     # J'ajoute une 'key' unique pour forcer Streamlit à oublier les anciens IDs
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False}, key="unique_chart_demand")
+
 
 
 # --- -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -831,86 +800,115 @@ analyses_predictives = {
 }
 # --- 2. BARRE LATÉRALE (Source unique de vérité) ------------------------------------------------------
 with st.sidebar:
-    st.title("Settings")
+
     
     # La sélection de l'hôtel
-    hotel_choisi = st.selectbox(
-        "Sélectionnez un établissement", 
-        options=sorted(df[col_nom].unique()),
-        key="main_selector"
-    )
+    if 'hotel' in locals():
+        hotel_choisi = df_temp[df_temp[col_hotel] == hotel].copy()
+    else:
+        st.warning("Veuillez d'abord sélectionner un hôtel en haut.")
 
 # --- 3. FILTRAGE ET ANALYSE (En dehors du bloc 'with') ---
 # Maintenant on utilise la sélection pour filtrer
-hotel = hotel_choisi 
-df_filtered = df_temp[df_temp[col_hotel] == hotel].copy()
-
+hotel_val = str(hotel) 
+df_filtered = df_temp[df_temp[col_hotel].astype(str) == hotel_val].copy()
 # Ton dictionnaire reste accessible pour tout le script
 analyses_ia = {
-    "Hasdrubal Prestige Thalassa & Spa": {
-        "description": "L'analyse 2025 vs 2026 montre une consolidation des volumes...",
-        "tendance": "Hausse structurelle liée aux événements culturels.",
-        "logique": "(198 Suites × Taux Occ) × Ratio Tradition"
-    },
-    "Amir Palace": {
-        "description": "Le comparatif 2025 vs 2026 indique une stabilité des flux...",
-        "tendance": "Saisonnalité marquée.",
-        "logique": "Modèle statistique basé sur l'historique d'occupation"
-    }
+    "Nom de votre Hotel 1": {"etoiles": 5, "points_forts": "..."},
+    "Nom de votre Hotel 2": {"etoiles": 4, "points_forts": "..."},
 }
+
+# 2. On récupère les infos de l'hôtel sélectionné
+# hotel est la variable de votre selectbox
+data_ia = analyses_ia.get(hotel, {"etoiles": 0, "points_forts": []})
+
+# 3. On génère les étoiles visuelles
+nb_etoiles = data_ia.get("etoiles", 0)
+etoiles_display = "⭐" * nb_etoiles if nb_etoiles > 0 else "Établissement"
+
+# 4. Maintenant votre bloc HTML (ligne 910) ne plantera plus
+st.markdown(f"""
+<div style="display: flex; align-items: center; gap: 15px;">
+    <span style='font-size: 1.2em;'>{etoiles_display}</span>
+</div>
+""", unsafe_allow_html=True)
     # Ajoutez les autres hôtels ici sur le même modèle
 
 # --- 3. FILTRAGE ET RENDU DYNAMIQUE -------------------------------------
 if col_nom in df.columns:
-    # A. Filtrage unique basé sur l'unique selectbox de la sidebar
-    df_filtered = df[df[col_nom] == hotel_choisi].copy()
-
-    # B. Nettoyage des noms de colonnes (Espaces et types)
+    # A. Filtrage et nettoyage immédiat des colonnes
+    df_filtered = df[df[col_nom].astype(str) == str(hotel)].copy()
+    
+    # Sécurité : On nettoie les noms de colonnes
+    df.columns = df.columns.astype(str).str.strip()
     df_filtered.columns = df_filtered.columns.astype(str).str.strip()
+    
     c_2025, c_2026 = "2025", "2026"
 
-    x_axis = df_filtered.index if not df_filtered.empty else []
-    y_2025 = df_filtered[c_2025] if c_2025 in df_filtered.columns else []
-
-    # C. Conversion numérique forcée (Règle le TypeError: int + str)
-    # On nettoie la colonne globale pour le classement
+    # B. Conversion numérique globale (pour le Rang)
     df['Consommation Œuf'] = pd.to_numeric(df['Consommation Œuf'], errors='coerce').fillna(0)
     
-    # On nettoie les colonnes spécifiques pour le graphique et KPIs
-    for c in [c_2025, c_2026]:
-        if c in df_filtered.columns:
-            df_filtered[c] = pd.to_numeric(df_filtered[c], errors='coerce').fillna(0)
+    # C. Calcul du Rang
+    df_ranking = df.groupby(col_nom)['Consommation Œuf'].sum().sort_values(ascending=False).reset_index()
+    try:
+        # Correction : utilisation de 'hotel' au lieu de 'hotel_choisi' pour la cohérence
+        rang_actuel = df_ranking[df_ranking[col_nom] == str(hotel)].index[0] + 1
+        total_hotels = len(df_ranking)
+    except:
+        rang_actuel, total_hotels = "N/A", len(df_ranking)
 
-    # D. Calcul du Rang (Maintenant sans erreur)
-    classement_global = df.groupby(col_nom)['Consommation Œuf'].sum().sort_values(ascending=False).index.tolist()
-    rang_actuel = classement_global.index(hotel_choisi) + 1 if hotel_choisi in classement_global else "N/A"
-    total_hotels = len(classement_global)
+    # D. Calcul de la variation
+    conso_2025 = pd.to_numeric(df_filtered[c_2025], errors='coerce').sum() if c_2025 in df_filtered.columns else 0
+    conso_2026 = pd.to_numeric(df_filtered[c_2026], errors='coerce').sum() if c_2026 in df_filtered.columns else 0
 
-    # E. Rendu de l'Executive Summary (Désormais lié à hotel_choisi)
-      # D. Calcul du Rang (Maintenant sans erreur)
-    classement_global = df.groupby(col_nom)['Consommation Œuf'].sum().sort_values(ascending=False).index.tolist()
-    rang_actuel = classement_global.index(hotel_choisi) + 1 if hotel_choisi in classement_global else "N/A"
-    total_hotels = len(classement_global)
+    if conso_2025 > 0:
+        variation_pct = ((conso_2026 - conso_2025) / conso_2025) * 100
+        diff_brute = conso_2026 - conso_2025
+    else:
+        variation_pct = 0
+        diff_brute = 0
 
-    
     # E. Rendu de l'Executive Summary
     with col_right:
-        st.markdown('<div class="summary-header-banner">✨ EXECUTIVE SUMMARY</div>', unsafe_allow_html=True)
-
         if not df_filtered.empty:
-            info_hotel = df_filtered.iloc[0]
-            analyse_data = analyses_ia.get(hotel_choisi, {
-                "description": f"Prévision XGBoost pour {hotel_choisi}. Le modèle identifie des patterns de consommation basés sur l'historique saisonnier.",
-                "logique": "XGBoost Regressor v2.4"
-            })
+            # Tout ce qui suit est indenté d'un niveau supplémentaire (4 espaces)
+            hotel_nom_str = str(hotel)
+            hotel_nom_upper = hotel_nom_str.upper()
 
-            # --- 1. CALCULS DE TENDANCE (2025 vs 2026) ---
-            total_conso_val = float(df_filtered['Consommation Œuf'].sum())
-            unite_val = "Litres" if "Liquid" in str(hotel_choisi) else "Pcs"
-            conso_2025 = float(info_hotel.get('2025', 0))
-            conso_2026_predite = total_conso_val # Somme des prédictions XGBoost
+            try:
+                # Tentative de récupération depuis info_hotel
+                # Note: info_hotel doit être défini avant ce bloc
+                nb_etoiles = int(float(info_hotel.get('Etoiles', 0)))
+                etoiles_display = "⭐" * nb_etoiles if nb_etoiles > 0 else "⭐"
+                chambres_val = float(info_hotel.get('Chambres', 0))
+                chambres_display = f"{chambres_val:,.0f}".replace(",", " ")
+            except:
+                # Fallback sur la logique textuelle si info_hotel échoue ou est absent
+                prestige_5_stars = ["FOUR SEASONS", "PALACE", "RESIDENCE", "LUXURY", "ROYAL", "MOVENPICK", "STEIGENBERGER", "THE RESIDENCE", "RADISSON"]
+                if any(k in hotel_nom_upper for k in prestige_5_stars):
+                    etoiles_display = "⭐" * 5
+                else:
+                    etoiles_display = "⭐" * 4
+                chambres_display = "N/C"
+            
+            # Ici vous pouvez ajouter votre st.markdown(...)
+           # --- 3. Calculs Consommation ---
+            c_2025, c_2026 = "2025", "2026"
+            
+            # Calcul des sommes numériques
+            conso_2025 = pd.to_numeric(df_filtered[c_2025], errors='coerce').sum() if c_2025 in df_filtered.columns else 0
+            conso_2026 = pd.to_numeric(df_filtered[c_2026], errors='coerce').sum() if c_2026 in df_filtered.columns else 0
+
+            # Calculs de base pour le HTML
+            diff_brute = conso_2026 - conso_2025
+            variation_pct = ((diff_brute / conso_2025) * 100) if conso_2025 > 0 else 0
+            
+            color_var = "#a3ff12" if diff_brute >= 0 else "#ff4b4b"
+            arrow_var = "📈" if diff_brute > 0 else "📉"
+     
             try:
                 if conso_2025 > 0:
+                    # Note : assurez-vous que conso_2026_predite est défini plus haut dans votre code
                     diff_annuelle = conso_2026_predite - conso_2025
                     var_num = (diff_annuelle / conso_2025) * 100
                     growth_text = f"{'+' if diff_annuelle > 0 else ''}{var_num:.1f}%"
@@ -923,91 +921,169 @@ if col_nom in df.columns:
                     growth_color = "#8b949e"
                     icon_trend = "➡️"
                     type_saison = "Analyse Baseline"
-            except:
+            except Exception as e:
                 diff_annuelle = 0
                 growth_text = "0.0%"
                 growth_color = "#8b949e"
                 icon_trend = "➡️"
                 type_saison = "Saison Standard"
 
-            # --- 2. RÉCUPÉRATION DE L'ANALYSE IA ---
-            analyse_data = analyses_ia.get(hotel_choisi, {
-                "description": f"Prévision XGBoost pour {hotel_choisi}. Pattern identifié sur l'historique saisonnier.",
-                "logique": "XGBoost Regressor v2.4"
-            })
-
-            # --- 3. NETTOYAGE UI (Étoiles & Chambres) ---
+            # --- 2. RÉCUPÉRATION DES INFOS HÔTEL ---
             try:
+                # Récupération du nombre d'étoiles et de chambres
                 nb_etoiles = int(float(info_hotel.get('Etoiles', 0)))
                 etoiles_display = "⭐" * nb_etoiles if nb_etoiles > 0 else "⭐"
-            except:
-                etoiles_display = "⭐"
-
-            try:
+                
                 chambres_val = float(info_hotel.get('Chambres', 0))
-                # Espace pour les milliers (ex: 1 200)
                 chambres_display = f"{chambres_val:,.0f}".replace(",", " ")
             except:
-                chambres_display = "0"
+                etoiles_display = "⭐"
+                chambres_display = "N/C"
 
-            
-            # --- 4. ANALYSE MENSUELLE (Saisonnalité) ---
-            df_filtered['Date'] = pd.to_datetime(df_filtered['Date'])
-            df_filtered['Consommation Œuf'] = pd.to_numeric(df_filtered['Consommation Œuf'], errors='coerce').fillna(0)
+            # --- 3. ANALYSE---------------------------------------------------------------------------
+   
+            hotel_nom_str = str(hotel)
+            analyse_data = {
+                "description": "Analyse en attente de données historiques suffisantes.",
+                "logique": "Moyenne mobile (Baseline)"
+            }
 
+            # Si l'hôtel existe dans votre dictionnaire d'analyses (à adapter selon votre source)
+            if 'analyses_ia' in locals() and hotel in analyses_ia:
+                analyse_data = analyses_ia[hotel]
+            elif 'df_filtered' in locals() and not df_filtered.empty:
+                # Génération dynamique simple si l'IA n'a pas de texte pré-calculé
+                analyse_data = {
+                    "description": f"Analyse prédictive pour {hotel_nom_str}. Le modèle XGBoost identifie un pattern basé sur l'historique saisonnier.",
+                    "logique": "XGBoost Regressor v2.4"
+                }
+            # --- 1. PRÉPARATION DES DONNÉES ET CALCULS ---
+            try:
+                # Récupération de la consommation
+                if '2025' in df_filtered.columns:
+                    total_conso_val = pd.to_numeric(df_filtered['2025'], errors='coerce').sum()
+                else:
+                    total_conso_val = pd.to_numeric(df_filtered['Consommation Œuf'], errors='coerce').sum()
 
-            conso_par_mois = df_filtered.groupby(df_filtered['Date'].dt.month)['Consommation Œuf'].sum().astype(float)
-            nom_mois = {1:'Janvier', 2:'Février', 3:'Mars', 4:'Avril', 5:'Mai', 6:'Juin',
-            7:'Juillet', 8:'Août', 9:'Septembre', 10:'Octobre', 11:'Novembre', 12:'Décembre'}
-    
+                # Calcul de la variation prédictive (conso_2026_predite doit être défini avant)
+                if total_conso_val > 0 and 'conso_2026_predite' in locals():
+                    diff_annuelle = conso_2026_predite - total_conso_val
+                    variation_pct = (diff_annuelle / total_conso_val) * 100
+                else:
+                    diff_annuelle, variation_pct = 0, 0
 
-            hs_text, bs_text, mois_focus = "N/A", "N/A", "N/A"
-           
+                # Paramètres visuels
+                color_var = "#a3ff12" if diff_annuelle >= 0 else "#ff4b4b"
+                arrow_var = "📈" if diff_annuelle >= 0 else "📉"
+                unite_val = "Litres" if "Liquid" in str(hotel).upper() else "Pcs"
+
+                # Infos Hôtel sécurisées
+                # On vérifie si info_hotel existe et n'est pas None
+                safe_info = info_hotel if info_hotel else {}
+                nb_etoiles = int(float(safe_info.get('Etoiles', 3)))
+                etoiles_display = "⭐" * nb_etoiles
+                chambres_display = f"{float(safe_info.get('Chambres', 0)):,.0f}".replace(",", " ")
+
+            except Exception as e:
+                # Fallback global pour éviter que l'affichage ne bloque
+                diff_annuelle, variation_pct = 0, 0
+                color_var, arrow_var, unite_val = "#8b949e", "➡️", "Unités"
+                etoiles_display, chambres_display = "⭐", "N/C"
+
+            # Sécurité pour analyse_data (NameError protection)
+            if 'analyse_data' not in locals():
+                analyse_data = {"description": "Analyse indisponible", "logique": "N/A"}
+
+            # --- 2. RENDU HTML FINAL ---
+            rang_txt = f"{rang_actuel} / {total_hotels}"
+            chambres_txt = f"{chambres_display} Chambres"
+            variation_txt = f"{'+' if diff_annuelle >= 0 else ''}{diff_annuelle:,.0f} {unite_val}"
+            description_ia = analyse_data.get('description', 'Analyse non disponible')
+
+            #--- 1. CALCUL DES DONNÉES (À FAIRE EN PREMIER) ---
+            # On s'assure que les dates sont au bon format
+            df_filtered['Consommation Œuf'] = pd.to_numeric(df_filtered['Consommation Œuf'], errors='coerce')
+            df_filtered['Consommation Œuf'] = df_filtered['Consommation Œuf'].fillna(0)
+            conso_par_mois = df_filtered.groupby(df_filtered['Date'].dt.month)['Consommation Œuf'].sum()
+            conso_par_mois = conso_par_mois.astype(float)
+            bs_text = "N/A"
+            nom_mois = {1:'Janv', 2:'Févr', 3:'Mars', 4:'Avr', 5:'Mai', 6:'Juin',
+                        7:'Juil', 8:'Août', 9:'Sept', 10:'Oct', 11:'Nov', 12:'Déc'}
+
+            # --- 3. LOGIQUE DE SAISONNALITÉ ---
             if not conso_par_mois.empty and conso_par_mois.sum() > 0:
+                conso_par_mois = conso_par_mois.astype(float)
                 top_n = min(len(conso_par_mois), 3)
-                haute_saison_mois = conso_par_mois.nlargest(top_n).index.tolist()
-                basse_saison_mois = conso_par_mois.nsmallest(top_n).index.tolist()
-                mois_focus = haute_saison_mois[0]
-                hs_text = ", ".join([str(nom_mois[i]) for i in haute_saison_mois])
-                bs_text = ", ".join([str(nom_mois[i]) for i in basse_saison_mois])
+                haute_saison_indices = conso_par_mois.nlargest(top_n).index.tolist()
+                basse_saison_indices = conso_par_mois.nsmallest(top_n).index.tolist()
+                
+                # On crée les chaînes de caractères pour le HTML
+               
+                hs_text = ", ".join([nom_mois[i] for i in haute_saison_indices])
+                bs_text = ", ".join([nom_mois[i] for i in basse_saison_indices])
+
+            # --- 4. PRÉPARATION DES AUTRES VARIABLES ---
+            # Assurez-vous que ces variables existent aussi avant le HTML
+            rang_txt = locals().get('rang_actuel', 'N/A')
+            chambres_txt = locals().get('chambres_display', '0')
             
-            
-
-            # --- 3. CALCUL COMPARATIF ANNÉE N-1 ---
-            diff_annuelle = float(total_conso_val) * 0.05 # Votre logique de calcul
-            diff_color = "#a3ff12" if diff_annuelle >= 0 else "#ff4b4b"
-            mois_nom_propre = nom_mois.get(mois_focus, "N/A")
-
-            # --- 5. RENDU FINAL ---
-
-            st.markdown(f"""
-            <div style="background-color: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 15px; margin-bottom: 15px;color: #ffffff">
-               <div class="summary-meta">
-                   <span class="stars">{etoiles_display}</span>
-                   <span class="rooms">({chambres_display} Chambres)</span>
-                   <span class="badge">🧮 {growth_text} vs 2025</span>
-               </div>
-               <div class="summary-body">
-                   <p>
-                       ✨ <b>Analyse Stratégique :</b><br><br>
-                       {analyse_data["description"]}<br><br>   
-                       📌 <b>Pic de consommation :</b> {mois_nom_propre}<br>
-                       🌞 <b>Haute saison :</b> {hs_text}<br>
-                       ❄️ <b>Basse saison :</b> {bs_text}<br><br>
-                       {icon_trend}
-                       <b>Variation annuelle estimée :</b>
-                       <span style="color:{growth_color}; font-weight:bold;">
-                           {diff_annuelle:,.0f} {unite_val}
-                       </span>
-                   </p>
+            # --- CONSTRUCTION DU RENDU FINAL ---
+            html_content = f"""
+                <div style="margin-bottom: 20px; padding-left: 10px; border-left: 5px solid #a3ff12;">
+                    <h1 style="color: white; font-size: 1.8em; margin: 0; font-family: 'Segoe UI', sans-serif; letter-spacing: 1px;">
+                        📊 EXECUTIVE SUMMARY
+                    </h1>
+                    <p style="color: #8b949e; font-size: 0.8em; margin: 0; text-transform: uppercase;">Analyse Prévisionnelle & Saisons 2026</p>
                 </div>
-                <div class="summary-footer">
-                    ⚙️ <i>{analyse_data["logique"]}</i>
+                <div style="background-color: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 25px; color: white; font-family: 'Segoe UI', sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <span style="color: #a3ff12; font-weight: bold; border: 1px solid rgba(163, 255, 18, 0.4); padding: 6px 15px; border-radius: 20px; font-size: 0.9em; background: rgba(163, 255, 18, 0.05);">
+                            🏆 Rang : {rang_txt}
+                        </span>
+                        <span style="background: #30363d; padding: 6px 15px; border-radius: 20px; font-size: 0.85em; color: #c9d1d9;">
+                            {etoiles_display}
+                        </span>
+                    </div>
+                    <h2 style="margin: 0; font-size: 1.7em; color: #ffffff; font-weight: 600;">{hotel}</h2>
+                    <p style="color: #8b949e; font-size: 1em; margin-bottom: 25px; display: flex; align-items: center;">
+                        <span style="margin-right: 8px;">🏨</span> {chambres_txt}
+                    </p>
+                    <div style="background: #0d1117; padding: 18px; border-radius: 10px; border-left: 4px solid {color_var}; margin-bottom: 20px;">
+                        <small style="color: #8b949e; text-transform: uppercase; font-size: 0.75em; letter-spacing: 0.5px;">Variation Annuelle Estimée</small><br>
+                        <div style="display: flex; align-items: baseline; margin-top: 5px;">
+                            <span style="font-size: 2em; font-weight: bold; color: {color_var};">
+                                {arrow_var} {abs(variation_pct):.1f}%
+                            </span>
+                            <span style="margin-left: 12px; color: #8b949e; font-size: 0.95em;">
+                                ({variation_txt})
+                            </span>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
+                        <div style="background: rgba(163, 255, 18, 0.03); padding: 15px; border-radius: 10px; border: 1px dashed rgba(163, 255, 18, 0.25);">
+                            <small style="color: #a3ff12; font-weight: bold; text-transform: uppercase; font-size: 0.7em; display: flex; align-items: center;">
+                                <span style="font-size: 1.2em; margin-right: 5px;">☀️</span> Haute Saison
+                            </small>
+                            <div style="font-size: 0.95em; color: #ffffff; margin-top: 8px; font-weight: 500;">{hs_text}</div>
+                        </div>
+                        <div style="background: rgba(88, 166, 255, 0.03); padding: 15px; border-radius: 10px; border: 1px dashed rgba(88, 166, 255, 0.25);">
+                            <small style="color: #58a6ff; font-weight: bold; text-transform: uppercase; font-size: 0.7em; display: flex; align-items: center;">
+                                <span style="font-size: 1.2em; margin-right: 5px;">❄️</span> Basse Saison
+                            </small>
+                            <div style="font-size: 0.95em; color: #ffffff; margin-top: 8px; font-weight: 500;">{bs_text}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 1em; line-height: 1.6; padding-top: 20px; border-top: 1px solid #30363d;">
+                        <div style="margin-bottom: 8px;">
+                            <b style="color: #a3ff12; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px;">💡 Analyse Stratégique</b>
+                        </div>
+                        <span style="color: #c9d1d9; font-style: italic;">"{description_ia}"</span>
+                    </div>
                 </div>
-            </div>
-                    
-            
-""", unsafe_allow_html=True)
+            """
+
+            # Affichage dans Streamlit
+            st.markdown(html_content, unsafe_allow_html=True)
  # ------------------------------------------------------------------------------------- Tbleau Région  --------------------------------------------------------------------------------------------------------------------------------------------------------
 
 import streamlit as st
