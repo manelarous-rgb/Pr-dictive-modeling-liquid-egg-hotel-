@@ -417,7 +417,7 @@ def load_data():
     # Simulation de données ou chargement réel
     try:
         # Remplacez par votre chemin réel
-        df = pd.read_excel('Liste_Hotelsgit status.xlsx')
+        df = pd.read_excel('Liste_Hotels.xlsx')
         df.columns = df.columns.str.strip()
         
         if 'Date' in df.columns:
@@ -648,6 +648,7 @@ with st.sidebar:
 #----------------------------------------------------------------------- --- 6. DASHBOARD ----------------------------------------------------------------------------------------------------
 
 # --- 6. DASHBOARD (Affichage final) ---
+conso_series = pd.Series([0])
 if not df_filtered.empty:
     # Récupération des données
     conso_col = next((c for c in df.columns if 'consommation' in c.lower()), df.columns[0])
@@ -670,14 +671,22 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # --- 4. PRÉPARATION DES DONNÉES ET DU GRAPHIQUE (DÉPLACÉ ICI) ---
 y_2025 = conso_series.values
-x_2025 = df_filtered['Date']
-x_2026 = x_2025 + pd.DateOffset(years=1)
-
+x_2025 = df_filtered['Date'] if not df_filtered.empty else []
+x_2026 = x_2025 + pd.DateOffset(years=1) if not df_filtered.empty else []
 # 1. DÉFINIR le chemin d'abord
 model = None  # <--- CRUCIAL : initialise la variable ici
-model_path = r"model.pkl"
+model_path = "model.pkl"
+# 2. TENTER DE CHARGER LE MODÈLE
+import pickle
+if os.path.exists(model_path):
+    try:
+        with open(model_path, 'rb') as f:
+            model = pickle.load(f)
+    except Exception as e:
+        st.error(f"Erreur lors du chargement du modèle : {e}")
 
-## --- 4. PRÉPARATION DES DONNÉES ---
+
+## --- 4. PRÉPARATION DES DONNÉES --------------------------------------------------------------------------------------------------------------
 # --- PRÉPARATION NUMÉRIQUE POUR XGBOOST ---
 if model is not None:
     # 1. On ne garde que les colonnes de type nombre (int, float)
@@ -708,7 +717,7 @@ if model is not None:
         st.error(f"Erreur lors de la prédiction : {e}")
         y_2026 = y_2025 * 1.0  # Secours
 else:
-    y_2026 = y_2025 * 1.0
+    y_2026 = y_2025 * 1.002
 
 fig = go.Figure()
 # Traces Pcs
