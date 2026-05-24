@@ -1094,7 +1094,7 @@ import os
 @st.cache_data
 def load_data():
     file_name = 'Donnees_Calculées.xlsx' #
-    alt_path = r"C:\Users\basma\OneDrive\Bureau\Streamlit1\Donnees_Calculées.xlsx" #
+    alt_path = r"C:\Users\basma\OneDrive\Bureau\Streamlit1\Donnees_Calculees.xlsx" #
     
     if os.path.exists(file_name):
         return pd.read_excel(file_name)
