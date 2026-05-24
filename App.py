@@ -254,7 +254,7 @@ def render_metric(column, title, value, unit, spark_data, delta_val, delta_text)
 def load_data():
     try:
         # REMPLACEZ 'votre_fichier.xlsx' par le nom de votre fichier dans le dossier
-        df = pd.read_excel("C:/Users/basma/OneDrive/Bureau/Streamlit1/Liste_HHotels.xlsx")
+        df = pd.read_excel("Liste_Hotels.xlsx")
 
 
         
