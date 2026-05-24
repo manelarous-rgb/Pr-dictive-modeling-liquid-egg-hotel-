@@ -417,7 +417,7 @@ def load_data():
     # Simulation de données ou chargement réel
     try:
         # Remplacez par votre chemin réel
-        df = pd.read_excel('Liste_HHotels.xlsx')
+        df = pd.read_excel('Liste_Hotelsgit status.xlsx')
         df.columns = df.columns.str.strip()
         
         if 'Date' in df.columns:
