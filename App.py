@@ -643,7 +643,7 @@ with st.sidebar:
                 # C'est ici que ça bloquait pour Jerba/Sfax !
                 st.error(f"❌ La région '{region_choisie}' n'existe pas dans le fichier Excel ou est écrite différemment.")
                 # Optionnel : afficher ce qui existe vraiment pour aider l'utilisateur
-                st.info(f"Régions trouvées dans le fichier : {', '.join(df[col_region].unique())}")
+                st.info(f"Régions trouvées dans le fichier : {', '.join(df[col_region].astype(str).unique())}")
 
 #----------------------------------------------------------------------- --- 6. DASHBOARD ----------------------------------------------------------------------------------------------------
 
