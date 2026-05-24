@@ -675,7 +675,7 @@ x_2026 = x_2025 + pd.DateOffset(years=1)
 
 # 1. DÉFINIR le chemin d'abord
 model = None  # <--- CRUCIAL : initialise la variable ici
-model_path = r"C:/Users/basma/OneDrive/Bureau/Streamlit1/model.pkl"
+model_path = r"model.pkl"
 
 ## --- 4. PRÉPARATION DES DONNÉES ---
 # --- PRÉPARATION NUMÉRIQUE POUR XGBOOST ---
