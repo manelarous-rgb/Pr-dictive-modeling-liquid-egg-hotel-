@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import pickle
 import os
 from io import BytesIO
-st.title("TEST : LE CODE EST BIEN MIS À JOUR")
+
 
 # --- 1. CONFIGURATION DE LA PAGE ---
 st.set_page_config(page_title="Predictive Modeling", layout="wide")
@@ -642,10 +642,10 @@ with st.sidebar:
                     st.warning(f"⚠️ Aucun hôtel trouvé pour {region_choisie}")
             else:
                 # C'est ici que ça bloquait pour Jerba/Sfax !
-                st.error(f"❌ La région '{region_choisie}' n'existe pas dans le fichier Excel ou est écrite différemment.")
-                # Optionnel : afficher ce qui existe vraiment pour aider l'utilisateur
-                st.info(f"Régions trouvées dans le fichier : {', '.join(df[col_region].astype(str).unique())}")
-
+                st.error(f"❌ La région '{region_choisie}' est introuvable.")
+                # On affiche les valeurs détectées pour que vous puissiez voir l'orthographe exacte
+                liste_regions = df[col_region].astype(str).unique()
+                st.info(f"Régions trouvées dans le fichier : {', '.join(liste_regions)}")
 #----------------------------------------------------------------------- --- 6. DASHBOARD ----------------------------------------------------------------------------------------------------
 
 # --- 6. DASHBOARD (Affichage final) ---
